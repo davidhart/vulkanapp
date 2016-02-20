@@ -1,0 +1,8 @@
+bin/*.exe
+bin/*.ilk
+bin/*.pdb
+obj/*
+.vs/*
+*.user
+*.sdf
+*.opensdf
