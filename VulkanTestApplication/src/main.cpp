@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 
+#define VK_USE_PLATFORM_WIN32_KHR
+
 #include <vulkan\vulkan.h>
 
 #define MAX_DEVICES
@@ -16,14 +18,18 @@ int main(char** argv, int argc)
 	appInfo.pNext = NULL;
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 
+	std::vector<const char*> enabledExtensions = {
+		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+	};
+
 	VkInstanceCreateInfo createInfo;
-	createInfo.enabledExtensionCount = 0;
-	createInfo.enabledLayerCount = 0;
 	createInfo.flags = 0;
 	createInfo.pApplicationInfo = &appInfo;
 	createInfo.pNext = NULL;
-	createInfo.ppEnabledExtensionNames = NULL;
+	createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+	createInfo.enabledExtensionCount = enabledExtensions.size();
 	createInfo.ppEnabledLayerNames = NULL;
+	createInfo.enabledLayerCount = 0;
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	VkInstance instance;
 
@@ -147,6 +153,60 @@ int main(char** argv, int argc)
 		std::cout << "Failed to create logical device" << std::endl;
 		return 1;
 	}
+
+	VkSurfaceKHR surface;
+	// Begin Windows specific
+	VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
+	surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	surfaceCreateInfo.hinstance = 0;
+	surfaceCreateInfo.hwnd = 0;
+	result = vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Failed to create win32 surface" << std::endl;
+		return 1;
+	}
+	// End Windows Specific
+
+	uint32_t formatCount;
+	result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, NULL);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Failed to get device surface formats" << std::endl;
+	}
+
+	std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+	result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.data());
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Failed to get device surface formats" << std::endl;
+	}
+
+	if (formatCount < 0)
+	{
+		std::cout << "No surface formats" << std::endl;
+	}
+
+	VkFormat colorFormat;
+	VkColorSpaceKHR colorSpace;
+
+	if (formatCount == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED)
+	{
+		colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
+	}
+	else
+	{
+		colorFormat = surfaceFormats[0].format;
+	}
+
+	colorSpace = surfaceFormats[0].colorSpace;
+
+	std::cout << "colorFormat: " << colorFormat << std::endl;
+	std::cout << "colorSpace: " << colorSpace << std::endl;
+
 	vkDestroyInstance(instance, NULL);
 	return 0;
 }
