@@ -1,11 +1,10 @@
 #include <iostream>
 #include <vector>
 
+#include "render_window.h"
+
 #define VK_USE_PLATFORM_WIN32_KHR
-
 #include <vulkan\vulkan.h>
-
-#define MAX_DEVICES
 
 int main(char** argv, int argc)
 {
@@ -70,7 +69,7 @@ int main(char** argv, int argc)
 
 	std::cout << "Device Count:" << deviceCount << std::endl;
 
-	for (int i = 0; i < deviceCount; ++i)
+	for (uint32_t i = 0; i < deviceCount; ++i)
 	{
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
@@ -102,7 +101,7 @@ int main(char** argv, int argc)
 	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
 
 	std::cout << "Device Queue Family Properties:" << std::endl;
-	for (int i = 0; i < queueFamilyPropertyCount; ++i)
+	for (uint32_t i = 0; i < queueFamilyPropertyCount; ++i)
 	{
 		VkQueueFamilyProperties& props = queueFamilyProperties[i];
 		std::cout << "============================================================" << std::endl;
@@ -154,12 +153,16 @@ int main(char** argv, int argc)
 		return 1;
 	}
 
+	RenderWindow renderWindow;
+	renderWindow.Create();
+	renderWindow.Show();
+
 	VkSurfaceKHR surface;
 	// Begin Windows specific
 	VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
 	surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	surfaceCreateInfo.hinstance = 0;
-	surfaceCreateInfo.hwnd = 0;
+	surfaceCreateInfo.hinstance = (HINSTANCE)GetModuleHandle(NULL);
+	surfaceCreateInfo.hwnd = renderWindow.GetNativeHandle();
 	result = vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
 
 	if (result != VK_SUCCESS)
@@ -206,6 +209,12 @@ int main(char** argv, int argc)
 
 	std::cout << "colorFormat: " << colorFormat << std::endl;
 	std::cout << "colorSpace: " << colorSpace << std::endl;
+
+	while (renderWindow.IsOpen())
+	{
+		renderWindow.DispatchEvents();
+		Sleep(0);
+	}
 
 	vkDestroyInstance(instance, NULL);
 	return 0;
