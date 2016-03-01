@@ -208,6 +208,15 @@ int main(char** argv, int argc)
 	}
 	// End Windows Specific
 
+	VkBool32 physicalDeviceSurfaceSupport;
+	vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, 0, surface, &physicalDeviceSurfaceSupport);
+
+	if (physicalDeviceSurfaceSupport == false)
+	{
+		std::cout << "Surface not supported for physical device queue 0" << std::endl;
+		return 1;
+	}
+
 	uint32_t formatCount;
 	result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, NULL);
 
@@ -256,15 +265,6 @@ int main(char** argv, int argc)
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL);
 	std::vector<VkPresentModeKHR> presentModes(presentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
-
-	VkBool32 physicalDeviceSurfaceSupport;
-	vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, 0, surface, &physicalDeviceSurfaceSupport);
-
-	if (physicalDeviceSurfaceSupport == false)
-	{
-		std::cout << "Surface not supported for physical device queue 0" << std::endl;
-		return 1;
-	}
 	
 	// Create swapchain
 	VkSwapchainCreateInfoKHR swapchainCreateInfo;
