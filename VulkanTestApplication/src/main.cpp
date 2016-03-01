@@ -210,6 +210,36 @@ int main(char** argv, int argc)
 	std::cout << "colorFormat: " << colorFormat << std::endl;
 	std::cout << "colorSpace: " << colorSpace << std::endl;
 
+	VkSwapchainCreateInfoKHR swapChainCreateInfo;
+	swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapChainCreateInfo.pNext = NULL;
+	swapChainCreateInfo.flags = 0;
+	swapChainCreateInfo.surface = surface;
+	swapChainCreateInfo.minImageCount = 2;
+	swapChainCreateInfo.imageFormat = colorFormat;
+	swapChainCreateInfo.imageColorSpace = colorSpace;
+	swapChainCreateInfo.imageExtent = { 800, 600 }; 	// Window width / height
+	swapChainCreateInfo.imageArrayLayers = 1;
+	swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	const uint32_t queueFamilyIndices[] = { 0 };
+	swapChainCreateInfo.queueFamilyIndexCount = 1;
+	swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+	swapChainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapChainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	swapChainCreateInfo.clipped = false;
+	swapChainCreateInfo.oldSwapchain = NULL;
+	
+	VkSwapchainKHR swapChain;
+	result = vkCreateSwapchainKHR(device, &swapChainCreateInfo, NULL, &swapChain);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't create swapchain" << std::endl;
+		return;
+	}
+
 	while (renderWindow.IsOpen())
 	{
 		renderWindow.DispatchEvents();
