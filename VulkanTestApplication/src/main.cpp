@@ -45,9 +45,9 @@ int main(char** argv, int argc)
 	VkInstance instance;
 
 	VkResult result;
-	
+
 	result = vkCreateInstance(&createInfo, NULL, &instance);
-	
+
 	if (result != VK_SUCCESS)
 	{
 		std::cout << "Failed to create instance" << std::endl;
@@ -80,7 +80,7 @@ int main(char** argv, int argc)
 		std::cout << "Failed to enumerate devices" << std::endl;
 		return 1;
 	}
-	
+
 	if (deviceCount == 0)
 	{
 		std::cout << "No devices found" << std::endl;
@@ -102,18 +102,18 @@ int main(char** argv, int argc)
 	{
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
-		
+
 		std::cout << "============================================================" << std::endl;
-		std::cout << "Api Version: " << VK_VERSION_MAJOR(deviceProperties.apiVersion) 
-			<< "." << VK_VERSION_MINOR(deviceProperties.apiVersion) 
-			<< "." << VK_VERSION_PATCH(deviceProperties.apiVersion) 
+		std::cout << "Api Version: " << VK_VERSION_MAJOR(deviceProperties.apiVersion)
+			<< "." << VK_VERSION_MINOR(deviceProperties.apiVersion)
+			<< "." << VK_VERSION_PATCH(deviceProperties.apiVersion)
 			<< std::endl;
-		std::cout << "Device ID: " <<  deviceProperties.deviceID << std::endl;
+		std::cout << "Device ID: " << deviceProperties.deviceID << std::endl;
 		std::cout << "Device Name: " << deviceProperties.deviceName << std::endl;
 		std::cout << "Device Type: " << deviceProperties.deviceType << std::endl;
 		std::cout << "Driver Version: " << VK_VERSION_MAJOR(deviceProperties.driverVersion)
 			<< "." << VK_VERSION_MINOR(deviceProperties.driverVersion)
-			<< "." << VK_VERSION_PATCH(deviceProperties.driverVersion) 
+			<< "." << VK_VERSION_PATCH(deviceProperties.driverVersion)
 			<< std::endl;
 		std::cout << "Device ID: " << deviceProperties.deviceID << std::endl;
 		std::cout << "VendorID: " << deviceProperties.vendorID << std::endl;
@@ -135,8 +135,8 @@ int main(char** argv, int argc)
 		VkQueueFamilyProperties& props = queueFamilyProperties[i];
 		std::cout << "============================================================" << std::endl;
 		std::cout << "minImageTransferGranularity- depth:" << props.minImageTransferGranularity.depth
-			<< " height:" << props.minImageTransferGranularity.height 
-			<< " width:" << props.minImageTransferGranularity.width 
+			<< " height:" << props.minImageTransferGranularity.height
+			<< " width:" << props.minImageTransferGranularity.width
 			<< std::endl;
 		std::cout << "queueCount: " << props.queueCount << std::endl;
 		std::cout << "queueFlags: " << props.queueFlags << std::endl;
@@ -265,7 +265,7 @@ int main(char** argv, int argc)
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, NULL);
 	std::vector<VkPresentModeKHR> presentModes(presentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
-	
+
 	// Create swapchain
 	VkSwapchainCreateInfoKHR swapchainCreateInfo;
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -287,7 +287,7 @@ int main(char** argv, int argc)
 	swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
 	swapchainCreateInfo.clipped = false;
 	swapchainCreateInfo.oldSwapchain = NULL;
-	
+
 	VkSwapchainKHR swapchain;
 	result = vkCreateSwapchainKHR(device, &swapchainCreateInfo, NULL, &swapchain);
 
@@ -313,7 +313,7 @@ int main(char** argv, int argc)
 		std::cout << "Couldn't get swapchain images" << std::endl;
 		return 1;
 	}
-	
+
 	VkSemaphoreCreateInfo presentCompleteSemaphoreCreateInfo;
 	presentCompleteSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	presentCompleteSemaphoreCreateInfo.pNext = NULL;
@@ -335,12 +335,28 @@ int main(char** argv, int argc)
 	attachmentDescription.flags = 0;
 	attachmentDescription.format = colorFormat;
 	attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentReference;
+	colorAttachmentReference.attachment = 0;
+	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpassDescription;
+	subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDescription.flags = 0;
+	subpassDescription.inputAttachmentCount = 0;
+	subpassDescription.pInputAttachments = NULL;
+	subpassDescription.colorAttachmentCount = 1;
+	subpassDescription.pColorAttachments = &colorAttachmentReference;
+	subpassDescription.pResolveAttachments = NULL;
+	subpassDescription.pDepthStencilAttachment = NULL;
+	subpassDescription.preserveAttachmentCount = 0;
+	subpassDescription.pPreserveAttachments = NULL;
 
 	VkRenderPassCreateInfo renderPassCreateInfo;
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -348,8 +364,8 @@ int main(char** argv, int argc)
 	renderPassCreateInfo.flags = 0;
 	renderPassCreateInfo.attachmentCount = 1;
 	renderPassCreateInfo.pAttachments = &attachmentDescription;
-	renderPassCreateInfo.subpassCount = 0;
-	renderPassCreateInfo.pSubpasses = NULL;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpassDescription;
 	renderPassCreateInfo.dependencyCount = 0;
 	renderPassCreateInfo.pDependencies = NULL;
 
@@ -404,13 +420,16 @@ int main(char** argv, int argc)
 		framebufferCreateInfo.flags = 0;
 		framebufferCreateInfo.renderPass = renderPass;
 		framebufferCreateInfo.attachmentCount = 1;
-		framebufferCreateInfo.pAttachments = &backbufferViews[i];
+		VkImageView backbufferView = backbufferViews[i];
+		framebufferCreateInfo.pAttachments = &backbufferView;
 		framebufferCreateInfo.width = surfaceCapabilities.currentExtent.width;
 		framebufferCreateInfo.height = surfaceCapabilities.currentExtent.height;
-		framebufferCreateInfo.layers = 0;
+		framebufferCreateInfo.layers = 1;
 
-		VkFramebuffer framebuffer;
-		result = vkCreateFramebuffer(device, &framebufferCreateInfo, NULL, &framebuffers[i]);
+		VkFramebuffer framebuffer = VK_NULL_HANDLE;
+		result = vkCreateFramebuffer(device, &framebufferCreateInfo, NULL, &framebuffer);
+
+		framebuffers[i] = framebuffer;
 
 		if (result != VK_SUCCESS)
 		{
@@ -433,7 +452,7 @@ int main(char** argv, int argc)
 	commandPoolCreateInfo.pNext = NULL;
 	commandPoolCreateInfo.flags = 0;
 	commandPoolCreateInfo.queueFamilyIndex = 0;
-	
+
 	VkCommandPool commandPool;
 	result = vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool);
 
@@ -481,11 +500,25 @@ int main(char** argv, int argc)
 		return 1;
 	}
 
+	VkImageMemoryBarrier imageMemoryBarrier;
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.pNext = NULL;
+	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	imageMemoryBarrier.srcQueueFamilyIndex = 0;
+	imageMemoryBarrier.dstQueueFamilyIndex = 0;
+	imageMemoryBarrier.image = swapchainImages[currentSwapImage];
+	imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+
 	VkClearValue clearValue;
 	clearValue.color.uint32[0] = UINT32_MAX;
 	clearValue.color.uint32[1] = 0;
 	clearValue.color.uint32[2] = 0;
 	clearValue.color.uint32[3] = 0;
+	clearValue.depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo;
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -496,9 +529,9 @@ int main(char** argv, int argc)
 	renderPassBeginInfo.renderArea.extent = surfaceCapabilities.currentExtent;
 	renderPassBeginInfo.clearValueCount = 1;
 	renderPassBeginInfo.pClearValues = &clearValue;
-
 	vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+	/*
 	VkClearAttachment clearAttachment;
 	clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	clearAttachment.clearValue.color.uint32[0] = UINT32_MAX;
@@ -512,8 +545,8 @@ int main(char** argv, int argc)
 	clearRect.layerCount = 1;
 	clearRect.rect.offset = { 0, 0 };
 	clearRect.rect.extent = surfaceCapabilities.currentExtent;
-
 	vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
+	*/
 
 	vkCmdEndRenderPass(commandBuffer);
 
@@ -525,11 +558,16 @@ int main(char** argv, int argc)
 		return 1;
 	}
 
-
 	VkSubmitInfo submitInfo;
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = NULL;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
-	// TODO: fill
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
 	vkQueueSubmit(queue, 1, &submitInfo, NULL);
 
 	VkPresentInfoKHR presentInfo;
@@ -541,7 +579,6 @@ int main(char** argv, int argc)
 	presentInfo.pSwapchains = &swapchain;
 	presentInfo.pImageIndices = &currentSwapImage;
 	presentInfo.pResults = &result;
-
 	result = vkQueuePresentKHR(queue, &presentInfo);
 
 	if (result != VK_SUCCESS)
