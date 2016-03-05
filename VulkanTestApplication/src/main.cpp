@@ -314,20 +314,6 @@ int main(char** argv, int argc)
 		return 1;
 	}
 
-	VkSemaphoreCreateInfo presentCompleteSemaphoreCreateInfo;
-	presentCompleteSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	presentCompleteSemaphoreCreateInfo.pNext = NULL;
-	presentCompleteSemaphoreCreateInfo.flags = 0;
-
-	VkSemaphore presentCompleteSemaphore;
-	result = vkCreateSemaphore(device, &presentCompleteSemaphoreCreateInfo, NULL, &presentCompleteSemaphore);
-
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't create present complete semaphore" << std::endl;
-		return 1;
-	}
-
 	VkQueue queue;
 	vkGetDeviceQueue(device, 0, 0, &queue);
 
@@ -438,15 +424,6 @@ int main(char** argv, int argc)
 		}
 	}
 
-	uint32_t currentSwapImage;
-	result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, NULL, NULL, &currentSwapImage);
-
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't aquire swapchain image" << std::endl;
-		return 1;
-	}
-
 	VkCommandPoolCreateInfo commandPoolCreateInfo;
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.pNext = NULL;
@@ -462,135 +439,283 @@ int main(char** argv, int argc)
 		return 1;
 	}
 
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo;
-	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferAllocateInfo.pNext = NULL;
-	commandBufferAllocateInfo.commandPool = commandPool;
-	commandBufferAllocateInfo.commandBufferCount = 1;
-	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	VkCommandBuffer commandBuffer;
-	result = vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer);
-
-	if (result != VK_SUCCESS)
+	// Initialise framebuffers
 	{
-		std::cout << "Couldn't allocate command buffer" << std::endl;
-		return 1;
-	}
+		VkCommandBufferAllocateInfo initCommandBufferAllocateInfo;
+		initCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		initCommandBufferAllocateInfo.pNext = NULL;
+		initCommandBufferAllocateInfo.commandPool = commandPool;
+		initCommandBufferAllocateInfo.commandBufferCount = 1;
+		initCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		VkCommandBuffer initCommandBuffer;
+		result = vkAllocateCommandBuffers(device, &initCommandBufferAllocateInfo, &initCommandBuffer);
 
-	VkCommandBufferInheritanceInfo commandBufferInheritanceInfo;
-	commandBufferInheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-	commandBufferInheritanceInfo.pNext = NULL;
-	commandBufferInheritanceInfo.renderPass = VK_NULL_HANDLE;
-	commandBufferInheritanceInfo.subpass = 0;
-	commandBufferInheritanceInfo.framebuffer = VK_NULL_HANDLE;
-	commandBufferInheritanceInfo.occlusionQueryEnable = VK_FALSE;
-	commandBufferInheritanceInfo.queryFlags = 0;
-	commandBufferInheritanceInfo.pipelineStatistics = 0;
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't allocate command buffer" << std::endl;
+			return 1;
+		}
 
-	VkCommandBufferBeginInfo commandBufferBeginInfo;
-	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	commandBufferBeginInfo.pNext = NULL;
-	commandBufferBeginInfo.flags = 0;
-	commandBufferBeginInfo.pInheritanceInfo = &commandBufferInheritanceInfo;
-	result = vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+		VkCommandBufferInheritanceInfo initCommandBufferInheritanceInfo;
+		initCommandBufferInheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+		initCommandBufferInheritanceInfo.pNext = NULL;
+		initCommandBufferInheritanceInfo.renderPass = VK_NULL_HANDLE;
+		initCommandBufferInheritanceInfo.subpass = 0;
+		initCommandBufferInheritanceInfo.framebuffer = VK_NULL_HANDLE;
+		initCommandBufferInheritanceInfo.occlusionQueryEnable = VK_FALSE;
+		initCommandBufferInheritanceInfo.queryFlags = 0;
+		initCommandBufferInheritanceInfo.pipelineStatistics = 0;
 
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't begin command buffer" << std::endl;
-		return 1;
-	}
+		VkCommandBufferBeginInfo initCommandBufferBeginInfo;
+		initCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		initCommandBufferBeginInfo.pNext = NULL;
+		initCommandBufferBeginInfo.flags = 0;
+		initCommandBufferBeginInfo.pInheritanceInfo = &initCommandBufferInheritanceInfo;
 
-	VkImageMemoryBarrier imageMemoryBarrier;
-	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	imageMemoryBarrier.pNext = NULL;
-	imageMemoryBarrier.srcAccessMask = 0;
-	imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	imageMemoryBarrier.srcQueueFamilyIndex = 0;
-	imageMemoryBarrier.dstQueueFamilyIndex = 0;
-	imageMemoryBarrier.image = swapchainImages[currentSwapImage];
-	imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
+		result = vkBeginCommandBuffer(initCommandBuffer, &initCommandBufferBeginInfo);
 
-	VkClearValue clearValue;
-	clearValue.color.uint32[0] = UINT32_MAX;
-	clearValue.color.uint32[1] = 0;
-	clearValue.color.uint32[2] = 0;
-	clearValue.color.uint32[3] = 0;
-	clearValue.depthStencil = { 1.0f, 0 };
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't begin command buffer" << std::endl;
+			return 1;
+		}
 
-	VkRenderPassBeginInfo renderPassBeginInfo;
-	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassBeginInfo.pNext = NULL;
-	renderPassBeginInfo.renderPass = renderPass;
-	renderPassBeginInfo.framebuffer = framebuffers[currentSwapImage];
-	renderPassBeginInfo.renderArea.offset = { 0, 0 };
-	renderPassBeginInfo.renderArea.extent = surfaceCapabilities.currentExtent;
-	renderPassBeginInfo.clearValueCount = 1;
-	renderPassBeginInfo.pClearValues = &clearValue;
-	vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		for (int i = 0; i < swapchainImages.size(); ++i)
+		{
+			VkImageMemoryBarrier initBackbufferBarrier;
+			initBackbufferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			initBackbufferBarrier.pNext = NULL;
+			initBackbufferBarrier.srcAccessMask = 0;
+			initBackbufferBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			initBackbufferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			initBackbufferBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			initBackbufferBarrier.srcQueueFamilyIndex = 0;
+			initBackbufferBarrier.dstQueueFamilyIndex = 0;
+			initBackbufferBarrier.image = swapchainImages[i];
+			initBackbufferBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+			vkCmdPipelineBarrier(initCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &initBackbufferBarrier);
+		}
 
-	/*
-	VkClearAttachment clearAttachment;
-	clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	clearAttachment.clearValue.color.uint32[0] = UINT32_MAX;
-	clearAttachment.clearValue.color.uint32[1] = 0;
-	clearAttachment.clearValue.color.uint32[2] = 0;
-	clearAttachment.clearValue.color.uint32[3] = 0;
-	clearAttachment.colorAttachment = 0;
+		result = vkEndCommandBuffer(initCommandBuffer);
+		
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't end command buffer" << std::endl;
+			return 1;
+		}
 
-	VkClearRect clearRect;
-	clearRect.baseArrayLayer = 0;
-	clearRect.layerCount = 1;
-	clearRect.rect.offset = { 0, 0 };
-	clearRect.rect.extent = surfaceCapabilities.currentExtent;
-	vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
-	*/
+		VkSubmitInfo initSubmitInfo;
+		initSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		initSubmitInfo.pNext = NULL;
+		initSubmitInfo.waitSemaphoreCount = 0;
+		initSubmitInfo.pWaitSemaphores = NULL;
+		initSubmitInfo.pWaitDstStageMask = NULL;
+		initSubmitInfo.commandBufferCount = 1;
+		initSubmitInfo.pCommandBuffers = &initCommandBuffer;
+		initSubmitInfo.signalSemaphoreCount = 0;
+		initSubmitInfo.pSignalSemaphores = NULL;
+		result = vkQueueSubmit(queue, 1, &initSubmitInfo, VK_NULL_HANDLE);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't submit command buffer" << std::endl;
+			return 1;
+		}
 
-	vkCmdEndRenderPass(commandBuffer);
+		result = vkQueueWaitIdle(queue);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Wait idle failed" << std::endl;
+			return 1;
+		}
 
-	result = vkEndCommandBuffer(commandBuffer);
-
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't end command buffer" << std::endl;
-		return 1;
-	}
-
-	VkSubmitInfo submitInfo;
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = NULL;
-	submitInfo.waitSemaphoreCount = 0;
-	submitInfo.pWaitSemaphores = NULL;
-	submitInfo.pWaitDstStageMask = NULL;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
-	submitInfo.signalSemaphoreCount = 0;
-	submitInfo.pSignalSemaphores = NULL;
-	vkQueueSubmit(queue, 1, &submitInfo, NULL);
-
-	VkPresentInfoKHR presentInfo;
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.pNext = NULL;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &presentCompleteSemaphore;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &swapchain;
-	presentInfo.pImageIndices = &currentSwapImage;
-	presentInfo.pResults = &result;
-	result = vkQueuePresentKHR(queue, &presentInfo);
-
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't present buffer" << std::endl;
-		return 1;
+		vkFreeCommandBuffers(device, commandPool, 1, &initCommandBuffer);
 	}
 
 	while (renderWindow.IsOpen())
 	{
+		VkSemaphoreCreateInfo presentCompleteSemaphoreCreateInfo;
+		presentCompleteSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		presentCompleteSemaphoreCreateInfo.pNext = NULL;
+		presentCompleteSemaphoreCreateInfo.flags = 0;
+
+		VkSemaphore presentCompleteSemaphore;
+		result = vkCreateSemaphore(device, &presentCompleteSemaphoreCreateInfo, NULL, &presentCompleteSemaphore);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create present complete semaphore" << std::endl;
+			return 1;
+		}
+
+		uint32_t currentSwapImage;
+		result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphore, NULL, &currentSwapImage);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't aquire swapchain image" << std::endl;
+
+			// if out of date respond to window resize?
+			return 1;
+		}
+
+		VkCommandBufferAllocateInfo commandBufferAllocateInfo;
+		commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		commandBufferAllocateInfo.pNext = NULL;
+		commandBufferAllocateInfo.commandPool = commandPool;
+		commandBufferAllocateInfo.commandBufferCount = 1;
+		commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		VkCommandBuffer commandBuffer;
+		result = vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't allocate command buffer" << std::endl;
+			return 1;
+		}
+
+		VkCommandBufferInheritanceInfo commandBufferInheritanceInfo;
+		commandBufferInheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+		commandBufferInheritanceInfo.pNext = NULL;
+		commandBufferInheritanceInfo.renderPass = VK_NULL_HANDLE;
+		commandBufferInheritanceInfo.subpass = 0;
+		commandBufferInheritanceInfo.framebuffer = VK_NULL_HANDLE;
+		commandBufferInheritanceInfo.occlusionQueryEnable = VK_FALSE;
+		commandBufferInheritanceInfo.queryFlags = 0;
+		commandBufferInheritanceInfo.pipelineStatistics = 0;
+
+		VkCommandBufferBeginInfo commandBufferBeginInfo;
+		commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		commandBufferBeginInfo.pNext = NULL;
+		commandBufferBeginInfo.flags = 0;
+		commandBufferBeginInfo.pInheritanceInfo = &commandBufferInheritanceInfo;
+		result = vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't begin command buffer" << std::endl;
+			return 1;
+		}
+
+		VkImageMemoryBarrier beginFrameBarrier;
+		beginFrameBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		beginFrameBarrier.pNext = NULL;
+		beginFrameBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		beginFrameBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		beginFrameBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		beginFrameBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		beginFrameBarrier.srcQueueFamilyIndex = 0;
+		beginFrameBarrier.dstQueueFamilyIndex = 0;
+		beginFrameBarrier.image = swapchainImages[currentSwapImage];
+		beginFrameBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &beginFrameBarrier);
+
+		VkClearValue clearValue;
+		clearValue.color.float32[0] = (float)rand() / (float)RAND_MAX;
+		clearValue.color.float32[1] = (float)rand() / (float)RAND_MAX;
+		clearValue.color.float32[2] = (float)rand() / (float)RAND_MAX;
+		clearValue.color.float32[3] = 1.0f;
+
+		VkRenderPassBeginInfo renderPassBeginInfo;
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.pNext = NULL;
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.framebuffer = framebuffers[currentSwapImage];
+		renderPassBeginInfo.renderArea.offset = { 0, 0 };
+		renderPassBeginInfo.renderArea.extent = surfaceCapabilities.currentExtent;
+		renderPassBeginInfo.clearValueCount = 1;
+		renderPassBeginInfo.pClearValues = &clearValue;
+		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		for (int i = 1; i < 5; ++i)
+		{
+			clearValue.color.float32[0] = (float)rand() / (float)RAND_MAX;
+			clearValue.color.float32[1] = (float)rand() / (float)RAND_MAX;
+			clearValue.color.float32[2] = (float)rand() / (float)RAND_MAX;
+			clearValue.color.float32[3] = 1.0f;
+
+			VkClearAttachment clearAttachment;
+			clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			clearAttachment.clearValue = clearValue;
+			clearAttachment.colorAttachment = 0;
+
+			VkClearRect clearRect;
+			clearRect.baseArrayLayer = 0;
+			clearRect.layerCount = 1;
+			clearRect.rect.offset = { i * 20, i * 20 };
+			clearRect.rect.extent = { surfaceCapabilities.currentExtent.width - i * 40, surfaceCapabilities.currentExtent.height - i * 40 };
+			vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
+		}
+
+		vkCmdEndRenderPass(commandBuffer);
+
+		VkImageMemoryBarrier endOfFrameBarrier;
+		endOfFrameBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		endOfFrameBarrier.pNext = NULL;
+		endOfFrameBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		endOfFrameBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		endOfFrameBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		endOfFrameBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		endOfFrameBarrier.srcQueueFamilyIndex = 0;
+		endOfFrameBarrier.dstQueueFamilyIndex = 0;
+		endOfFrameBarrier.image = swapchainImages[currentSwapImage];
+		endOfFrameBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &endOfFrameBarrier);
+
+		result = vkEndCommandBuffer(commandBuffer);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't end command buffer" << std::endl;
+			return 1;
+		}
+
+		VkSubmitInfo submitInfo;
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.pNext = NULL;
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = &presentCompleteSemaphore;
+		submitInfo.pWaitDstStageMask = NULL;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		submitInfo.signalSemaphoreCount = 0;
+		submitInfo.pSignalSemaphores = NULL;
+		result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't submit command buffer" << std::endl;
+		}
+
+		VkPresentInfoKHR presentInfo;
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.pNext = NULL;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &presentCompleteSemaphore;
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &swapchain;
+		presentInfo.pImageIndices = &currentSwapImage;
+		presentInfo.pResults = &result;
+		result = vkQueuePresentKHR(queue, &presentInfo);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't present buffer" << std::endl;
+			return 1;
+		}
+
+		result = vkQueueWaitIdle(queue);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Wait Idle failed" << std::endl;
+			return 1;
+		}
+
+		vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+
+		vkDestroySemaphore(device, presentCompleteSemaphore, NULL);
+
 		renderWindow.DispatchEvents();
-		Sleep(0);		
 	}
 
 	vkDestroyInstance(instance, NULL);
