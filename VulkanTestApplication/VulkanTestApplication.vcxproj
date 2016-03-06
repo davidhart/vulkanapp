@@ -25,6 +25,12 @@
   <ItemGroup>
     <ClInclude Include="src\render_window.h" />
   </ItemGroup>
+  <ItemGroup>
+    <FragShader Include="shaders\tri.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <VertShader Include="shaders\tri.vert" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0606196C-9758-47C6-98A1-8F9FF68BFE86}</ProjectGuid>
     <RootNamespace>VulkanTestApplication</RootNamespace>
@@ -146,4 +152,5 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Import Project="..\config\SPIRVShader.targets" />
 </Project>

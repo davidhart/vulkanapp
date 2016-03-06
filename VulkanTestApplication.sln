@@ -5,6 +5,12 @@ VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VulkanTestApplication", "VulkanTestApplication\VulkanTestApplication.vcxproj", "{0606196C-9758-47C6-98A1-8F9FF68BFE86}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "config", "config", "{0633EB29-51F5-476B-91AD-AF1308F2AC48}"
+	ProjectSection(SolutionItems) = preProject
+		config\SPIRVShader.targets = config\SPIRVShader.targets
+		config\SPIRVShader.xml = config\SPIRVShader.xml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <fstream>
 
 #include "render_window.h"
 
@@ -480,7 +481,7 @@ int main(char** argv, int argc)
 			return 1;
 		}
 
-		for (int i = 0; i < swapchainImages.size(); ++i)
+		for (size_t i = 0; i < swapchainImages.size(); ++i)
 		{
 			VkImageMemoryBarrier initBackbufferBarrier;
 			initBackbufferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -530,6 +531,103 @@ int main(char** argv, int argc)
 
 		vkFreeCommandBuffers(device, commandPool, 1, &initCommandBuffer);
 	}
+
+	// Initialise drawable
+	VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
+	descriptorSetLayoutBinding.binding = 0;
+	descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetLayoutBinding.descriptorCount = 0;
+	descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	descriptorSetLayoutBinding.pImmutableSamplers = NULL;
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptorSetLayoutCreateInfo.pNext = NULL;
+	descriptorSetLayoutCreateInfo.flags = 0;
+	descriptorSetLayoutCreateInfo.bindingCount = 1;
+	descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
+
+	VkDescriptorSetLayout descriptorSetLayout;
+	result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't create decriptor set" << std::endl;
+		return 1;
+	}
+
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutCreateInfo.pNext = NULL;
+	pipelineLayoutCreateInfo.flags = 0;
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+	pipelineLayoutCreateInfo.pPushConstantRanges = 0;
+
+	VkPipelineLayout pipelineLayout;
+	result = vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout);
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't create pipeline layout" << std::endl;
+		return 1;
+	}
+
+	VkShaderModule vertModule;
+	{
+		std::ifstream vertfile("tri.vert.spv", std::ios::binary);
+		if (vertfile.is_open() == false)
+		{
+			std::cout << "Couldn't read tri.vert.spv" << std::endl;
+			return 1;
+		}
+
+		std::vector<char> contents;
+		contents.reserve(10000);
+		contents.assign(std::istreambuf_iterator<char>(vertfile), std::istreambuf_iterator<char>());
+
+		VkShaderModuleCreateInfo vertModuleCreateInfo;
+		vertModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		vertModuleCreateInfo.pNext = NULL;
+		vertModuleCreateInfo.flags = 0;
+		vertModuleCreateInfo.codeSize = contents.size();
+		vertModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(contents.data());
+
+		result = vkCreateShaderModule(device, &vertModuleCreateInfo, NULL, &vertModule);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create vert shader module" << std::endl;
+			return 1;
+		}
+	}
+
+	VkShaderModule fragModule;
+	{
+		std::ifstream fragfile("tri.frag.spv", std::ios::binary);
+		if (fragfile.is_open() == false)
+		{
+			std::cout << "Couldn't read tri.frag.spv" << std::endl;
+			return 1;
+		}
+
+		std::vector<char> contents;
+		contents.reserve(10000);
+		contents.assign(std::istreambuf_iterator<char>(fragfile), std::istreambuf_iterator<char>());
+
+		VkShaderModuleCreateInfo vertModuleCreateInfo;
+		vertModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		vertModuleCreateInfo.pNext = NULL;
+		vertModuleCreateInfo.flags = 0;
+		vertModuleCreateInfo.codeSize = contents.size();
+		vertModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(contents.data());
+
+		result = vkCreateShaderModule(device, &vertModuleCreateInfo, NULL, &fragModule);
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create vert shader module" << std::endl;
+			return 1;
+		}
+	}
+
 
 	while (renderWindow.IsOpen())
 	{
@@ -645,6 +743,11 @@ int main(char** argv, int argc)
 			clearRect.rect.extent = { surfaceCapabilities.currentExtent.width - i * 40, surfaceCapabilities.currentExtent.height - i * 40 };
 			vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
 		}
+
+		//vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,  );
+		//vkCmdSetViewport();
+		//vkCmdDraw();
 
 		vkCmdEndRenderPass(commandBuffer);
 

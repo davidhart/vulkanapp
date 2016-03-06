@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+		<PropertyPageSchema Include="$(MSBuildThisFileDirectory)SPIRVShader.xml" />
+		<AvailableItemName Include="FragShader">
+			<Targets>CompileFragShader</Targets>
+		</AvailableItemName>
+		<AvailableItemName Include="VertShader">
+			<Targets>CompileVertShader</Targets>
+		</AvailableItemName>
+	</ItemGroup>
+
+	<Target Name="CompileFragShader" BeforeTargets="ClCompile" Inputs="%(FragShader.FullPath)" Outputs="$(OutDir)%(FragShader.Filename).frag.spv">
+		<Message Text="Generating code: %(FragShader.FullPath)" Importance="High" />
+		<Exec Command="glslangValidator -V &quot;%(FragShader.FullPath)&quot; -o &quot;$(OutDir)%(FragShader.Filename).frag.spv&quot;"/>
+	</Target>
+
+	<Target Name="CompileVertShader" BeforeTargets="ClCompile" Inputs="%(VertShader.FullPath)" Outputs="$(OutDir)%(VertShader.Filename).vert.spv">
+		<Message Text="Generating code: %(VertShader.FullPath)" Importance="High" />
+		<Exec Command="glslangValidator -V &quot;%(VertShader.FullPath)&quot; -o &quot;$(OutDir)%(VertShader.Filename).vert.spv&quot;"/>
+	</Target>
+</Project>

@@ -3,16 +3,37 @@
   <ItemGroup>
     <Filter Include="src">
       <UniqueIdentifier>{8f42376f-2a71-478b-99e0-b8fe0f4c31b2}</UniqueIdentifier>
-      <Extensions>.cpp</Extensions>
+      <Extensions>
+      </Extensions>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{77a601c9-06f5-4e01-aa5d-e960530078a6}</UniqueIdentifier>
+      <Extensions>
+      </Extensions>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\render_window.cpp" />
+    <ClCompile Include="src\render_window.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\render_window.h" />
+    <ClInclude Include="src\render_window.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FragShader Include="shaders\tri.frag">
+      <Filter>shaders</Filter>
+    </FragShader>
+    <FragShader Include="shaders\tri - Copy.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <VertShader Include="shaders\tri.vert">
+      <Filter>shaders</Filter>
+    </VertShader>
   </ItemGroup>
 </Project>

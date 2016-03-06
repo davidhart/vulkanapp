@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProjectSchemaDefinitions xmlns="http://schemas.microsoft.com/build/2009/properties">
+
+  <ContentType Name="FragShader" DisplayName="Frag Shader" ItemType="FragShader" />
+  <ItemType Name="FragShader" DisplayName="Frag Shader" />
+  <FileExtension Name=".frag" ContentType="FragShader" />
+  <Rule Name="FragShader" DisplayName="Frag Shader" Order="500" PageTemplate="tool" />
+
+  <ContentType Name="VertShader" DisplayName="Vert Shader" ItemType="VertShader" />
+  <ItemType Name="VertShader" DisplayName="Vert Shader" />
+  <FileExtension Name=".vert" ContentType="VertShader" />
+  <Rule Name="VertShader" DisplayName="Frag Shader" Order="500" PageTemplate="tool" />
+  
+</ProjectSchemaDefinitions>
