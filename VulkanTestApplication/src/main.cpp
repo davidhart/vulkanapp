@@ -144,6 +144,8 @@ int main(char** argv, int argc)
 		std::cout << "timestampValidBits: " << props.timestampValidBits << std::endl;
 	}
 
+	VkPhysicalDeviceMemoryProperties memoryProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
 	// For now use a single queue (first available)
 	std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
@@ -533,34 +535,34 @@ int main(char** argv, int argc)
 	}
 
 	// Initialise drawable
-	VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
-	descriptorSetLayoutBinding.binding = 0;
-	descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorSetLayoutBinding.descriptorCount = 0;
-	descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	descriptorSetLayoutBinding.pImmutableSamplers = NULL;
+	//VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
+	//descriptorSetLayoutBinding.binding = 0;
+	//descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//descriptorSetLayoutBinding.descriptorCount = 0;
+	//descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//descriptorSetLayoutBinding.pImmutableSamplers = NULL;
 
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descriptorSetLayoutCreateInfo.pNext = NULL;
-	descriptorSetLayoutCreateInfo.flags = 0;
-	descriptorSetLayoutCreateInfo.bindingCount = 1;
-	descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
+	//descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	//descriptorSetLayoutCreateInfo.pNext = NULL;
+	//descriptorSetLayoutCreateInfo.flags = 0;
+	//descriptorSetLayoutCreateInfo.bindingCount = 0;
+	//descriptorSetLayoutCreateInfo.pBindings = NULL;
 
-	VkDescriptorSetLayout descriptorSetLayout;
-	result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Couldn't create decriptor set" << std::endl;
-		return 1;
-	}
+	//VkDescriptorSetLayout descriptorSetLayout;
+	//result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
+	//if (result != VK_SUCCESS)
+	//{
+	//	std::cout << "Couldn't create decriptor set" << std::endl;
+	//	return 1;
+	//}
 
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.pNext = NULL;
 	pipelineLayoutCreateInfo.flags = 0;
-	pipelineLayoutCreateInfo.setLayoutCount = 1;
-	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+	pipelineLayoutCreateInfo.setLayoutCount = 0;
+	pipelineLayoutCreateInfo.pSetLayouts = NULL;
 	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 	pipelineLayoutCreateInfo.pPushConstantRanges = 0;
 
@@ -670,12 +672,12 @@ int main(char** argv, int argc)
 		VkVertexInputAttributeDescription vertexAttributes[2];
 		vertexAttributes[0].binding = 0;
 		vertexAttributes[0].location = 0;
-		vertexAttributes[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		vertexAttributes[0].offset = 0;
 
 		vertexAttributes[1].binding = 0;
 		vertexAttributes[1].location = 1;
-		vertexAttributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		vertexAttributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		vertexAttributes[1].offset = sizeof(float) * 3;
 
 		VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo;
@@ -704,7 +706,7 @@ int main(char** argv, int argc)
 
 		VkRect2D scissor;
 		scissor.offset = { 0, 0 };
-		scissor.extent = surfaceCapabilities.currentExtent;
+		scissor.extent = { surfaceCapabilities.currentExtent.width, surfaceCapabilities.currentExtent.height };
 
 		VkPipelineViewportStateCreateInfo viewportCreateInfo;
 		viewportCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -773,10 +775,10 @@ int main(char** argv, int argc)
 		colorBlendCreateInfo.logicOp = VK_LOGIC_OP_CLEAR;
 		colorBlendCreateInfo.attachmentCount = 1;
 		colorBlendCreateInfo.pAttachments = &colorBlendAttachmentState;
-		colorBlendCreateInfo.blendConstants[0] = 0.f;
-		colorBlendCreateInfo.blendConstants[1] = 0.f;
-		colorBlendCreateInfo.blendConstants[2] = 0.f;
-		colorBlendCreateInfo.blendConstants[3] = 0.f;
+		colorBlendCreateInfo.blendConstants[0] = 1.f;
+		colorBlendCreateInfo.blendConstants[1] = 1.f;
+		colorBlendCreateInfo.blendConstants[2] = 1.f;
+		colorBlendCreateInfo.blendConstants[3] = 1.f;
 
 		VkPipelineDynamicStateCreateInfo dynamicCreateInfo;
 		dynamicCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -811,6 +813,85 @@ int main(char** argv, int argc)
 		if (result != VK_SUCCESS)
 		{
 			std::cout << "Couldn't create graphics pipeline" << std::endl;
+			return 1;
+		}
+	}
+
+	VkBuffer vertBuffer;
+	VkDeviceMemory vertDeviceMemory;
+	{
+		const float buffer[3][6] = {
+			{ -1.0f, -1.0f,  0.25f,     1.0f, 0.0f, 0.0f },
+			{ 1.0f, -1.0f,  0.25f,      0.0f, 1.0f, 0.0f },
+			{ 0.0f,  1.0f,  0.25f,       0.0f, 0.0f, 1.0f },
+		};
+		VkDeviceSize bufferSize = sizeof(buffer);
+
+		VkBufferCreateInfo bufferCreateInfo;
+		bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferCreateInfo.pNext = NULL;
+		bufferCreateInfo.flags = 0;
+		bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		bufferCreateInfo.size = bufferSize;
+		
+		result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &vertBuffer);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create buffer" << std::endl;
+			return 1;
+		}
+
+		VkMemoryAllocateInfo bufferAllocateInfo;
+		bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		bufferAllocateInfo.pNext = NULL;
+		bufferAllocateInfo.allocationSize = bufferSize;
+		bufferAllocateInfo.memoryTypeIndex = 0;
+
+		bool validMemoryType = false;
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
+		{
+			if (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+			{
+				bufferAllocateInfo.memoryTypeIndex = i;
+				validMemoryType = true;
+				break;
+			}
+		}
+
+		if (validMemoryType == false)
+		{
+			std::cout << "Couldn't find memory type with VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT" << std::endl;
+			return 1;
+		}
+
+		result = vkAllocateMemory(device, &bufferAllocateInfo, NULL, &vertDeviceMemory);
+		
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't allocate buffer" << std::endl;
+			return 1;
+		}
+
+		void* mappedMem;
+
+		result = vkMapMemory(device, vertDeviceMemory, 0, bufferSize, 0, &mappedMem);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't map memory" << std::endl;
+			return 1;
+		}
+
+		memcpy(mappedMem, buffer, bufferSize);
+
+		vkUnmapMemory(device, vertDeviceMemory);
+
+		result = vkBindBufferMemory(device, vertBuffer, vertDeviceMemory, 0);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't bind memory" << std::endl;
 			return 1;
 		}
 	}
@@ -905,7 +986,8 @@ int main(char** argv, int argc)
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.framebuffer = framebuffers[currentSwapImage];
 		renderPassBeginInfo.renderArea.offset = { 0, 0 };
-		renderPassBeginInfo.renderArea.extent = surfaceCapabilities.currentExtent;
+		renderPassBeginInfo.renderArea.extent.width = surfaceCapabilities.currentExtent.width - 1;
+		renderPassBeginInfo.renderArea.extent.height = surfaceCapabilities.currentExtent.width - 1;
 		renderPassBeginInfo.clearValueCount = 1;
 		renderPassBeginInfo.pClearValues = &clearValue;
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -930,10 +1012,12 @@ int main(char** argv, int argc)
 			vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
 		}
 
-		//vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,  );
-		//vkCmdSetViewport();
-		//vkCmdDraw();
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		VkDeviceSize offset = 0;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertBuffer, &offset);
+
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -941,11 +1025,11 @@ int main(char** argv, int argc)
 		endOfFrameBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		endOfFrameBarrier.pNext = NULL;
 		endOfFrameBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		endOfFrameBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		endOfFrameBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		endOfFrameBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		endOfFrameBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		endOfFrameBarrier.srcQueueFamilyIndex = 0;
-		endOfFrameBarrier.dstQueueFamilyIndex = 0;
+		endOfFrameBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		endOfFrameBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		endOfFrameBarrier.image = swapchainImages[currentSwapImage];
 		endOfFrameBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &endOfFrameBarrier);
