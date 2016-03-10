@@ -10,7 +10,7 @@
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t location, int32_t msgCode, const char *pLayerPrefix, const char *pMsg, void *pUserData)
 {
 	std::cout << pLayerPrefix << ": " << pMsg << std::endl;
-	return 1;
+	return false;
 }
 
 int main(char** argv, int argc)
@@ -118,11 +118,32 @@ int main(char** argv, int argc)
 			<< std::endl;
 		std::cout << "Device ID: " << deviceProperties.deviceID << std::endl;
 		std::cout << "VendorID: " << deviceProperties.vendorID << std::endl;
-
 	}
 
 	// For now pick the first available physical device..
 	VkPhysicalDevice physicalDevice = physicalDevices[0];
+
+
+	RenderWindow renderWindow;
+	renderWindow.Create();
+	renderWindow.Show();
+
+	VkSurfaceKHR surface;
+	// Begin Windows specific
+	VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
+	surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	surfaceCreateInfo.pNext = NULL;
+	surfaceCreateInfo.flags = 0;
+	surfaceCreateInfo.hinstance = (HINSTANCE)GetModuleHandle(NULL);
+	surfaceCreateInfo.hwnd = renderWindow.GetNativeHandle();
+	result = vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Failed to create win32 surface" << std::endl;
+		return 1;
+	}
+	// End Windows Specific
 
 	// Enumerate queue family properties
 	uint32_t queueFamilyPropertyCount = 0;
@@ -130,19 +151,28 @@ int main(char** argv, int argc)
 	std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropertyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties.data());
 
-	std::cout << "Device Queue Family Properties:" << std::endl;
+	uint32_t graphicsQueueIndex = UINT32_MAX;
+
 	for (uint32_t i = 0; i < queueFamilyPropertyCount; ++i)
 	{
 		VkQueueFamilyProperties& props = queueFamilyProperties[i];
-		std::cout << "============================================================" << std::endl;
-		std::cout << "minImageTransferGranularity- depth:" << props.minImageTransferGranularity.depth
-			<< " height:" << props.minImageTransferGranularity.height
-			<< " width:" << props.minImageTransferGranularity.width
-			<< std::endl;
-		std::cout << "queueCount: " << props.queueCount << std::endl;
-		std::cout << "queueFlags: " << props.queueFlags << std::endl;
-		std::cout << "timestampValidBits: " << props.timestampValidBits << std::endl;
+		
+		VkBool32 surfaceSupport;
+		vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &surfaceSupport);
+
+		if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT && surfaceSupport)
+		{
+			graphicsQueueIndex = i;
+			break;
+		}
 	}
+
+	if (graphicsQueueIndex == UINT32_MAX)
+	{
+		std::cout << "No compatible device queue found" << std::endl;
+		return 1;
+	}
+
 
 	VkPhysicalDeviceMemoryProperties memoryProperties;
 	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
@@ -154,7 +184,7 @@ int main(char** argv, int argc)
 	deviceQueueCreateInfo.pNext = NULL;
 	deviceQueueCreateInfo.flags = 0;
 	// First queue from family list
-	deviceQueueCreateInfo.queueFamilyIndex = 0;
+	deviceQueueCreateInfo.queueFamilyIndex = graphicsQueueIndex;
 	// Single queue
 	const float queuePriorities[] = { 1.0f }; // normalized floats, 1.0 is highest priority
 	deviceQueueCreateInfo.queueCount = 1;
@@ -187,36 +217,6 @@ int main(char** argv, int argc)
 	if (result != VK_SUCCESS)
 	{
 		std::cout << "Failed to create logical device" << std::endl;
-		return 1;
-	}
-
-	RenderWindow renderWindow;
-	renderWindow.Create();
-	renderWindow.Show();
-
-	VkSurfaceKHR surface;
-	// Begin Windows specific
-	VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
-	surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	surfaceCreateInfo.pNext = NULL;
-	surfaceCreateInfo.flags = 0;
-	surfaceCreateInfo.hinstance = (HINSTANCE)GetModuleHandle(NULL);
-	surfaceCreateInfo.hwnd = renderWindow.GetNativeHandle();
-	result = vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
-
-	if (result != VK_SUCCESS)
-	{
-		std::cout << "Failed to create win32 surface" << std::endl;
-		return 1;
-	}
-	// End Windows Specific
-
-	VkBool32 physicalDeviceSurfaceSupport;
-	vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, 0, surface, &physicalDeviceSurfaceSupport);
-
-	if (physicalDeviceSurfaceSupport == false)
-	{
-		std::cout << "Surface not supported for physical device queue 0" << std::endl;
 		return 1;
 	}
 
@@ -282,13 +282,12 @@ int main(char** argv, int argc)
 	swapchainCreateInfo.imageArrayLayers = 1;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	const uint32_t queueFamilyIndices[] = { 0 };
-	swapchainCreateInfo.queueFamilyIndexCount = 1;
-	swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
-	swapchainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
+	swapchainCreateInfo.queueFamilyIndexCount = 0;
+	swapchainCreateInfo.pQueueFamilyIndices = NULL;
+	swapchainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-	swapchainCreateInfo.clipped = false;
+	swapchainCreateInfo.clipped = true;
 	swapchainCreateInfo.oldSwapchain = NULL;
 
 	VkSwapchainKHR swapchain;
@@ -430,8 +429,8 @@ int main(char** argv, int argc)
 	VkCommandPoolCreateInfo commandPoolCreateInfo;
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.pNext = NULL;
-	commandPoolCreateInfo.flags = 0;
-	commandPoolCreateInfo.queueFamilyIndex = 0;
+	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	commandPoolCreateInfo.queueFamilyIndex = graphicsQueueIndex;
 
 	VkCommandPool commandPool;
 	result = vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool);
@@ -542,7 +541,7 @@ int main(char** argv, int argc)
 	//descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	//descriptorSetLayoutBinding.pImmutableSamplers = NULL;
 
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+	//VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
 	//descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	//descriptorSetLayoutCreateInfo.pNext = NULL;
 	//descriptorSetLayoutCreateInfo.flags = 0;
@@ -695,27 +694,15 @@ int main(char** argv, int argc)
 		inputAssemblyCreateInfo.flags = 0;
 		inputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		inputAssemblyCreateInfo.primitiveRestartEnable = VK_FALSE;
-
-		VkViewport viewport;
-		viewport.x = 0;
-		viewport.y = 0;
-		viewport.width = (float)surfaceCapabilities.currentExtent.width;
-		viewport.height = (float)surfaceCapabilities.currentExtent.height;
-		viewport.minDepth = 0.f;
-		viewport.maxDepth = 1.f;
-
-		VkRect2D scissor;
-		scissor.offset = { 0, 0 };
-		scissor.extent = { surfaceCapabilities.currentExtent.width, surfaceCapabilities.currentExtent.height };
-
+		
 		VkPipelineViewportStateCreateInfo viewportCreateInfo;
 		viewportCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 		viewportCreateInfo.pNext = NULL;
 		viewportCreateInfo.flags = 0;
 		viewportCreateInfo.viewportCount = 1;
-		viewportCreateInfo.pViewports = &viewport;
+		viewportCreateInfo.pViewports = NULL;
 		viewportCreateInfo.scissorCount = 1;
-		viewportCreateInfo.pScissors = &scissor;
+		viewportCreateInfo.pScissors = NULL;
 
 		VkPipelineRasterizationStateCreateInfo rasterizationCreateInfo;
 		rasterizationCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -724,7 +711,7 @@ int main(char** argv, int argc)
 		rasterizationCreateInfo.depthClampEnable = VK_FALSE;
 		rasterizationCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 		rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-		rasterizationCreateInfo.cullMode = VK_CULL_MODE_NONE;
+		rasterizationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
 		rasterizationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 		rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 		rasterizationCreateInfo.depthBiasConstantFactor = 0.f;
@@ -755,7 +742,7 @@ int main(char** argv, int argc)
 		depthStencilCreateInfo.front = { VK_STENCIL_OP_KEEP, VK_STENCIL_OP_KEEP, VK_STENCIL_OP_KEEP, VK_COMPARE_OP_ALWAYS, 0, 0, 0 };
 		depthStencilCreateInfo.back = { VK_STENCIL_OP_KEEP, VK_STENCIL_OP_KEEP, VK_STENCIL_OP_KEEP, VK_COMPARE_OP_ALWAYS, 0, 0, 0 };
 		depthStencilCreateInfo.minDepthBounds = 0.f;
-		depthStencilCreateInfo.maxDepthBounds = 0.f;
+		depthStencilCreateInfo.maxDepthBounds = 1.f;
 
 		VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
 		colorBlendAttachmentState.blendEnable = VK_FALSE;
@@ -780,12 +767,15 @@ int main(char** argv, int argc)
 		colorBlendCreateInfo.blendConstants[2] = 1.f;
 		colorBlendCreateInfo.blendConstants[3] = 1.f;
 
+
+		VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+
 		VkPipelineDynamicStateCreateInfo dynamicCreateInfo;
 		dynamicCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		dynamicCreateInfo.pNext = NULL;
 		dynamicCreateInfo.flags = 0;
-		dynamicCreateInfo.dynamicStateCount = 0;
-		dynamicCreateInfo.pDynamicStates = NULL;
+		dynamicCreateInfo.dynamicStateCount = 2;
+		dynamicCreateInfo.pDynamicStates = dynamicStates;
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo;
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -823,9 +813,9 @@ int main(char** argv, int argc)
 		const float buffer[3][6] = {
 			{ -1.0f, -1.0f,  0.25f,     1.0f, 0.0f, 0.0f },
 			{ 1.0f, -1.0f,  0.25f,      0.0f, 1.0f, 0.0f },
-			{ 0.0f,  1.0f,  0.25f,       0.0f, 0.0f, 1.0f },
+			{ 0.0f,  1.0f,  1.0f,       0.0f, 0.0f, 1.0f },
 		};
-		VkDeviceSize bufferSize = sizeof(buffer);
+		size_t bufferSize = sizeof(buffer);
 
 		VkBufferCreateInfo bufferCreateInfo;
 		bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -833,6 +823,9 @@ int main(char** argv, int argc)
 		bufferCreateInfo.flags = 0;
 		bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		bufferCreateInfo.size = bufferSize;
+		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		bufferCreateInfo.queueFamilyIndexCount = 0;
+		bufferCreateInfo.pQueueFamilyIndices = NULL;
 		
 		result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &vertBuffer);
 
@@ -848,15 +841,23 @@ int main(char** argv, int argc)
 		bufferAllocateInfo.allocationSize = bufferSize;
 		bufferAllocateInfo.memoryTypeIndex = 0;
 
+		VkMemoryRequirements memoryRequirements;
+		vkGetBufferMemoryRequirements(device, vertBuffer, &memoryRequirements);
+
+		uint32_t typeBits = memoryRequirements.memoryTypeBits;
 		bool validMemoryType = false;
 		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
 		{
-			if (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+			if (memoryRequirements.memoryTypeBits & 1)
 			{
-				bufferAllocateInfo.memoryTypeIndex = i;
-				validMemoryType = true;
-				break;
+				if (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+				{
+					bufferAllocateInfo.memoryTypeIndex = i;
+					validMemoryType = true;
+					break;
+				}
 			}
+			typeBits >>= 1;
 		}
 
 		if (validMemoryType == false)
@@ -913,7 +914,7 @@ int main(char** argv, int argc)
 		}
 
 		uint32_t currentSwapImage;
-		result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphore, NULL, &currentSwapImage);
+		result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, presentCompleteSemaphore, VK_NULL_HANDLE, &currentSwapImage);
 
 		if (result != VK_SUCCESS)
 		{
@@ -922,7 +923,7 @@ int main(char** argv, int argc)
 			// if out of date respond to window resize?
 			return 1;
 		}
-
+		
 		VkCommandBufferAllocateInfo commandBufferAllocateInfo;
 		commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		commandBufferAllocateInfo.pNext = NULL;
@@ -960,16 +961,16 @@ int main(char** argv, int argc)
 			std::cout << "Couldn't begin command buffer" << std::endl;
 			return 1;
 		}
-
+		
 		VkImageMemoryBarrier beginFrameBarrier;
 		beginFrameBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		beginFrameBarrier.pNext = NULL;
-		beginFrameBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		beginFrameBarrier.srcAccessMask = 0;
 		beginFrameBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		beginFrameBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		beginFrameBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		beginFrameBarrier.srcQueueFamilyIndex = 0;
-		beginFrameBarrier.dstQueueFamilyIndex = 0;
+		beginFrameBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		beginFrameBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		beginFrameBarrier.image = swapchainImages[currentSwapImage];
 		beginFrameBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &beginFrameBarrier);
@@ -986,12 +987,12 @@ int main(char** argv, int argc)
 		renderPassBeginInfo.renderPass = renderPass;
 		renderPassBeginInfo.framebuffer = framebuffers[currentSwapImage];
 		renderPassBeginInfo.renderArea.offset = { 0, 0 };
-		renderPassBeginInfo.renderArea.extent.width = surfaceCapabilities.currentExtent.width - 1;
-		renderPassBeginInfo.renderArea.extent.height = surfaceCapabilities.currentExtent.width - 1;
+		renderPassBeginInfo.renderArea.extent.width = surfaceCapabilities.currentExtent.width;
+		renderPassBeginInfo.renderArea.extent.height = surfaceCapabilities.currentExtent.width;
 		renderPassBeginInfo.clearValueCount = 1;
 		renderPassBeginInfo.pClearValues = &clearValue;
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
+		
 		for (int i = 1; i < 5; ++i)
 		{
 			clearValue.color.float32[0] = (float)rand() / (float)RAND_MAX;
@@ -1014,6 +1015,22 @@ int main(char** argv, int argc)
 
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+		VkViewport viewport;
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)surfaceCapabilities.currentExtent.width;
+		viewport.height = (float)surfaceCapabilities.currentExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+		VkRect2D scissor;
+		scissor.extent.width = surfaceCapabilities.currentExtent.width;
+		scissor.extent.height = surfaceCapabilities.currentExtent.height;
+		scissor.offset.x = 0;
+		scissor.offset.y = 0;
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertBuffer, &offset);
 
@@ -1032,7 +1049,7 @@ int main(char** argv, int argc)
 		endOfFrameBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		endOfFrameBarrier.image = swapchainImages[currentSwapImage];
 		endOfFrameBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &endOfFrameBarrier);
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &endOfFrameBarrier);
 
 		result = vkEndCommandBuffer(commandBuffer);
 
@@ -1042,12 +1059,14 @@ int main(char** argv, int argc)
 			return 1;
 		}
 
+		VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
 		VkSubmitInfo submitInfo;
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.pNext = NULL;
 		submitInfo.waitSemaphoreCount = 1;
 		submitInfo.pWaitSemaphores = &presentCompleteSemaphore;
-		submitInfo.pWaitDstStageMask = NULL;
+		submitInfo.pWaitDstStageMask = &waitDstStageMask;
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &commandBuffer;
 		submitInfo.signalSemaphoreCount = 0;
@@ -1059,20 +1078,29 @@ int main(char** argv, int argc)
 			std::cout << "Couldn't submit command buffer" << std::endl;
 		}
 
+		VkResult queuePresentResult = VK_SUCCESS;
+
 		VkPresentInfoKHR presentInfo;
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.pNext = NULL;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &presentCompleteSemaphore;
+		presentInfo.waitSemaphoreCount = 0;
+		presentInfo.pWaitSemaphores = NULL;
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &swapchain;
 		presentInfo.pImageIndices = &currentSwapImage;
-		presentInfo.pResults = &result;
+		presentInfo.pResults = &queuePresentResult;
+		
 		result = vkQueuePresentKHR(queue, &presentInfo);
 
 		if (result != VK_SUCCESS)
 		{
 			std::cout << "Couldn't present buffer" << std::endl;
+			return 1;
+		}
+
+		if (queuePresentResult != VK_SUCCESS)
+		{
+			std::cout << "Queue present failed" << std::endl;
 			return 1;
 		}
 
