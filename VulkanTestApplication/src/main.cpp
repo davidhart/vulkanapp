@@ -13,6 +13,88 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkFlags msgFlags, VkDebugReportObj
 	return false;
 }
 
+bool memory_type_from_properties(const VkMemoryType* memoryTypes, uint32_t typeBits, VkFlags requirementsMask, uint32_t* typeIndex)
+{
+	for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++)
+	{
+		if (typeBits & 1 && memoryTypes[i].propertyFlags & requirementsMask)
+		{
+			*typeIndex = i;
+			return true;
+		}
+		typeBits >>= 1;
+	}
+
+	return false;
+}
+
+bool CreateBuffer(VkDevice device, VkBufferUsageFlags usageFlags, const VkMemoryType* memoryTypes, void* data, size_t dataSize, VkBuffer* buffer, VkDeviceMemory* memory)
+{
+	VkBufferCreateInfo bufferCreateInfo;
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.pNext = NULL;
+	bufferCreateInfo.flags = 0;
+	bufferCreateInfo.usage = usageFlags;
+	bufferCreateInfo.size = dataSize;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	bufferCreateInfo.queueFamilyIndexCount = 0;
+	bufferCreateInfo.pQueueFamilyIndices = NULL;
+
+	VkResult result = vkCreateBuffer(device, &bufferCreateInfo, NULL, buffer);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(device, *buffer, &memoryRequirements);
+
+	VkMemoryAllocateInfo bufferAllocateInfo;
+	bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	bufferAllocateInfo.pNext = NULL;
+	bufferAllocateInfo.allocationSize = dataSize;
+	bufferAllocateInfo.memoryTypeIndex = 0;
+
+	bool validMemoryType = memory_type_from_properties(memoryTypes, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &bufferAllocateInfo.memoryTypeIndex);
+
+	if (validMemoryType == false)
+	{
+		return false;
+	}
+
+	result = vkAllocateMemory(device, &bufferAllocateInfo, NULL, memory);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	if (data != NULL)
+	{
+		void* mappedMem;
+		result = vkMapMemory(device, *memory, 0, dataSize, 0, &mappedMem);
+
+		if (result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		memcpy(mappedMem, data, dataSize);
+
+		vkUnmapMemory(device, *memory);
+	}
+
+	result = vkBindBufferMemory(device, *buffer, *memory, 0);
+
+	if (result != VK_SUCCESS)
+	{
+		false;
+	}
+
+	return true;
+}
+
 int main(char** argv, int argc)
 {
 	VkApplicationInfo appInfo;
@@ -31,7 +113,7 @@ int main(char** argv, int argc)
 	};
 
 	std::vector<const char*> enabledLayers = {
-		"VK_LAYER_LUNARG_standard_validation"
+		//"VK_LAYER_LUNARG_standard_validation"
 	};
 
 	VkInstanceCreateInfo createInfo;
@@ -534,34 +616,34 @@ int main(char** argv, int argc)
 	}
 
 	// Initialise drawable
-	//VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
-	//descriptorSetLayoutBinding.binding = 0;
-	//descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	//descriptorSetLayoutBinding.descriptorCount = 0;
-	//descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	//descriptorSetLayoutBinding.pImmutableSamplers = NULL;
+	VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
+	descriptorSetLayoutBinding.binding = 0;
+	descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorSetLayoutBinding.descriptorCount = 1;
+	descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	descriptorSetLayoutBinding.pImmutableSamplers = NULL;
 
-	//VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-	//descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	//descriptorSetLayoutCreateInfo.pNext = NULL;
-	//descriptorSetLayoutCreateInfo.flags = 0;
-	//descriptorSetLayoutCreateInfo.bindingCount = 0;
-	//descriptorSetLayoutCreateInfo.pBindings = NULL;
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
+	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptorSetLayoutCreateInfo.pNext = NULL;
+	descriptorSetLayoutCreateInfo.flags = 0;
+	descriptorSetLayoutCreateInfo.bindingCount = 1;
+	descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
 
-	//VkDescriptorSetLayout descriptorSetLayout;
-	//result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
-	//if (result != VK_SUCCESS)
-	//{
-	//	std::cout << "Couldn't create decriptor set" << std::endl;
-	//	return 1;
-	//}
+	VkDescriptorSetLayout descriptorSetLayout;
+	result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't create decriptor set" << std::endl;
+		return 1;
+	}
 
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.pNext = NULL;
 	pipelineLayoutCreateInfo.flags = 0;
-	pipelineLayoutCreateInfo.setLayoutCount = 0;
-	pipelineLayoutCreateInfo.pSetLayouts = NULL;
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
 	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 	pipelineLayoutCreateInfo.pPushConstantRanges = 0;
 
@@ -809,96 +891,110 @@ int main(char** argv, int argc)
 
 	VkBuffer vertBuffer;
 	VkDeviceMemory vertDeviceMemory;
+
+	const float buffer[3][6] = {
+		{ -1.0f, -1.0f,  0.25f,     1.0f, 0.0f, 0.0f },
+		{ 1.0f, -1.0f,  0.25f,      0.0f, 1.0f, 0.0f },
+		{ 0.0f,  1.0f,  1.0f,       0.0f, 0.0f, 1.0f },
+	};
+	size_t bufferSize = sizeof(buffer);
+
+	bool vertBufferCreated = CreateBuffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, memoryProperties.memoryTypes, (void*)buffer, bufferSize, &vertBuffer, &vertDeviceMemory);
+	
+	if (vertBufferCreated == false)
 	{
-		const float buffer[3][6] = {
-			{ -1.0f, -1.0f,  0.25f,     1.0f, 0.0f, 0.0f },
-			{ 1.0f, -1.0f,  0.25f,      0.0f, 1.0f, 0.0f },
-			{ 0.0f,  1.0f,  1.0f,       0.0f, 0.0f, 1.0f },
-		};
-		size_t bufferSize = sizeof(buffer);
-
-		VkBufferCreateInfo bufferCreateInfo;
-		bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferCreateInfo.pNext = NULL;
-		bufferCreateInfo.flags = 0;
-		bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		bufferCreateInfo.size = bufferSize;
-		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		bufferCreateInfo.queueFamilyIndexCount = 0;
-		bufferCreateInfo.pQueueFamilyIndices = NULL;
-		
-		result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &vertBuffer);
-
-		if (result != VK_SUCCESS)
-		{
-			std::cout << "Couldn't create buffer" << std::endl;
-			return 1;
-		}
-
-		VkMemoryAllocateInfo bufferAllocateInfo;
-		bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		bufferAllocateInfo.pNext = NULL;
-		bufferAllocateInfo.allocationSize = bufferSize;
-		bufferAllocateInfo.memoryTypeIndex = 0;
-
-		VkMemoryRequirements memoryRequirements;
-		vkGetBufferMemoryRequirements(device, vertBuffer, &memoryRequirements);
-
-		uint32_t typeBits = memoryRequirements.memoryTypeBits;
-		bool validMemoryType = false;
-		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
-		{
-			if (memoryRequirements.memoryTypeBits & 1)
-			{
-				if (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-				{
-					bufferAllocateInfo.memoryTypeIndex = i;
-					validMemoryType = true;
-					break;
-				}
-			}
-			typeBits >>= 1;
-		}
-
-		if (validMemoryType == false)
-		{
-			std::cout << "Couldn't find memory type with VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT" << std::endl;
-			return 1;
-		}
-
-		result = vkAllocateMemory(device, &bufferAllocateInfo, NULL, &vertDeviceMemory);
-		
-		if (result != VK_SUCCESS)
-		{
-			std::cout << "Couldn't allocate buffer" << std::endl;
-			return 1;
-		}
-
-		void* mappedMem;
-
-		result = vkMapMemory(device, vertDeviceMemory, 0, bufferSize, 0, &mappedMem);
-
-		if (result != VK_SUCCESS)
-		{
-			std::cout << "Couldn't map memory" << std::endl;
-			return 1;
-		}
-
-		memcpy(mappedMem, buffer, bufferSize);
-
-		vkUnmapMemory(device, vertDeviceMemory);
-
-		result = vkBindBufferMemory(device, vertBuffer, vertDeviceMemory, 0);
-
-		if (result != VK_SUCCESS)
-		{
-			std::cout << "Couldn't bind memory" << std::endl;
-			return 1;
-		}
+		std::cout << "Couldn't create vertex buffer" << std::endl;
+		return 1;
 	}
+
+	VkBuffer uniformBuffer;
+	VkDeviceMemory uniformDeviceMemory;
+	size_t uniformSize = sizeof(float)*16;
+	bool uniformBufferCreated = CreateBuffer(device, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, memoryProperties.memoryTypes, NULL, uniformSize, &uniformBuffer, &uniformDeviceMemory);
+
+	if (uniformBufferCreated == false)
+	{
+		std::cout << "Couldn't create uniform buffer" << std::endl;
+		return 1;
+	}
+
+	VkDescriptorPoolSize descriptorPoolSize;
+	descriptorPoolSize.descriptorCount = 1;
+	descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
+	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCreateInfo.pNext = NULL;
+	descriptorPoolCreateInfo.flags = 0;
+	descriptorPoolCreateInfo.maxSets = 1;
+	descriptorPoolCreateInfo.poolSizeCount = 1;
+	descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+
+	VkDescriptorPool descriptorPool;
+	result = vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't create descriptor pool" << std::endl;
+	}
+
+	VkDescriptorSet descriptorSet;
+	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
+	descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptorSetAllocateInfo.pNext = NULL;
+	descriptorSetAllocateInfo.descriptorPool = descriptorPool; 
+	descriptorSetAllocateInfo.descriptorSetCount = 1;
+	descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+	result = vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet);
+
+	if (result != VK_SUCCESS)
+	{
+		std::cout << "Couldn't allocate descriptor set" << std::endl;
+		return 1;
+	}
+
+	VkDescriptorBufferInfo uniformBufferInfo;
+	uniformBufferInfo.buffer = uniformBuffer;
+	uniformBufferInfo.offset = 0;
+	uniformBufferInfo.range = uniformSize;
+
+	VkWriteDescriptorSet uniformWrite;
+	uniformWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	uniformWrite.pNext = NULL;
+	uniformWrite.dstSet = descriptorSet;
+	uniformWrite.dstBinding = 0;
+	uniformWrite.dstArrayElement = 0;
+	uniformWrite.descriptorCount = 1;
+	uniformWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uniformWrite.pImageInfo = NULL;
+	uniformWrite.pBufferInfo = &uniformBufferInfo;
+	uniformWrite.pTexelBufferView = NULL;
+	vkUpdateDescriptorSets(device, 1, &uniformWrite, 0, NULL);
+
+
+	float t = 0.0f;
 
 	while (renderWindow.IsOpen())
 	{
+		t += 0.0001f;
+
+		void* mappedUniform;
+		result = vkMapMemory(device, uniformDeviceMemory, 0, uniformSize, 0, &mappedUniform);
+
+		float uniformData[16] = { cos(t), sin(t), 0.0f, 0.0f,
+								  -sin(t), cos(t), 0.0f, 0.0f,
+								  0.0f, 0.0f, 1.0f, 0.0f,
+								  0.0f, 0.0f, 0.0f, 1.0f };
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Unable to map uniform memory" << std::endl;
+			return 1;
+		}
+
+		memcpy(mappedUniform, uniformData, uniformSize);
+		vkUnmapMemory(device, uniformDeviceMemory);
+
 		VkSemaphoreCreateInfo presentCompleteSemaphoreCreateInfo;
 		presentCompleteSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 		presentCompleteSemaphoreCreateInfo.pNext = NULL;
@@ -1015,6 +1111,8 @@ int main(char** argv, int argc)
 
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+
 		VkViewport viewport;
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
@@ -1035,6 +1133,8 @@ int main(char** argv, int argc)
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertBuffer, &offset);
 
 		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+
 
 		vkCmdEndRenderPass(commandBuffer);
 
