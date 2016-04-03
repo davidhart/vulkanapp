@@ -17,7 +17,7 @@ bool memory_type_from_properties(const VkMemoryType* memoryTypes, uint32_t typeB
 {
 	for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++)
 	{
-		if (typeBits & 1 && memoryTypes[i].propertyFlags & requirementsMask)
+		if (typeBits & 1 && (memoryTypes[i].propertyFlags & requirementsMask) == requirementsMask)
 		{
 			*typeIndex = i;
 			return true;
@@ -26,6 +26,48 @@ bool memory_type_from_properties(const VkMemoryType* memoryTypes, uint32_t typeB
 	}
 
 	return false;
+}
+
+bool CreateDeviceMemory(VkDevice device, const VkMemoryType* memoryTypes, const VkMemoryRequirements* memoryRequirements, VkFlags requirementsMask, size_t dataSize, VkDeviceMemory* memory)
+{
+	VkMemoryAllocateInfo bufferAllocateInfo;
+	bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	bufferAllocateInfo.pNext = NULL;
+	bufferAllocateInfo.allocationSize = dataSize;
+	bufferAllocateInfo.memoryTypeIndex = 0;
+
+	bool validMemoryType = memory_type_from_properties(memoryTypes, memoryRequirements->memoryTypeBits, requirementsMask, &bufferAllocateInfo.memoryTypeIndex);
+
+	if (validMemoryType == false)
+	{
+		return false;
+	}
+
+	VkResult result = vkAllocateMemory(device, &bufferAllocateInfo, NULL, memory);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool SetDeviceMemory(VkDevice device, VkDeviceMemory memory, void* data, size_t dataSize)
+{
+	void* mappedMem;
+	VkResult result = vkMapMemory(device, memory, 0, dataSize, 0, &mappedMem);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	memcpy(mappedMem, data, dataSize);
+
+	vkUnmapMemory(device, memory);
+
+	return true;
 }
 
 bool CreateBuffer(VkDevice device, VkBufferUsageFlags usageFlags, const VkMemoryType* memoryTypes, void* data, size_t dataSize, VkBuffer* buffer, VkDeviceMemory* memory)
@@ -50,46 +92,73 @@ bool CreateBuffer(VkDevice device, VkBufferUsageFlags usageFlags, const VkMemory
 	VkMemoryRequirements memoryRequirements;
 	vkGetBufferMemoryRequirements(device, *buffer, &memoryRequirements);
 
-	VkMemoryAllocateInfo bufferAllocateInfo;
-	bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	bufferAllocateInfo.pNext = NULL;
-	bufferAllocateInfo.allocationSize = dataSize;
-	bufferAllocateInfo.memoryTypeIndex = 0;
-
-	bool validMemoryType = memory_type_from_properties(memoryTypes, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &bufferAllocateInfo.memoryTypeIndex);
-
-	if (validMemoryType == false)
-	{
-		return false;
-	}
-
-	result = vkAllocateMemory(device, &bufferAllocateInfo, NULL, memory);
-
-	if (result != VK_SUCCESS)
+	if (CreateDeviceMemory(device, memoryTypes, &memoryRequirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, dataSize, memory) == false)
 	{
 		return false;
 	}
 
 	if (data != NULL)
 	{
-		void* mappedMem;
-		result = vkMapMemory(device, *memory, 0, dataSize, 0, &mappedMem);
-
-		if (result != VK_SUCCESS)
+		if (SetDeviceMemory(device, *memory, data, dataSize) == false)
 		{
 			return false;
 		}
-
-		memcpy(mappedMem, data, dataSize);
-
-		vkUnmapMemory(device, *memory);
 	}
 
 	result = vkBindBufferMemory(device, *buffer, *memory, 0);
 
 	if (result != VK_SUCCESS)
 	{
-		false;
+		return false;
+	}
+
+	return true;
+}
+
+bool CreateImage2D(VkDevice device, uint32_t width, uint32_t height, VkFormat format, const VkMemoryType* memoryTypes, void* data, size_t dataSize, VkImage* image, VkDeviceMemory* memory)
+{
+	VkImageCreateInfo imageCreateInfo;
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.pNext = NULL;
+	imageCreateInfo.flags = 0;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = format;
+	imageCreateInfo.extent = { width, height, 1 };
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR; 	// TODO:  THIS MIGHT NOT BE SUPPORTED, may need to use staging texture!
+	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.queueFamilyIndexCount = 0;
+	imageCreateInfo.pQueueFamilyIndices = NULL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkResult result = vkCreateImage(device, &imageCreateInfo, NULL, image);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(device, *image, &memoryRequirements);
+
+	if (CreateDeviceMemory(device, memoryTypes, &memoryRequirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, dataSize, memory) == false)
+	{
+		return false;
+	}
+
+	if (SetDeviceMemory(device, *memory, data, dataSize) == false)
+	{
+		return false;
+	}
+
+	result = vkBindImageMemory(device, *image, *memory, 0);
+
+	if (result != VK_SUCCESS)
+	{
+		return false;
 	}
 
 	return true;
@@ -113,7 +182,7 @@ int main(char** argv, int argc)
 	};
 
 	std::vector<const char*> enabledLayers = {
-		//"VK_LAYER_LUNARG_standard_validation"
+		"VK_LAYER_LUNARG_standard_validation"
 	};
 
 	VkInstanceCreateInfo createInfo;
@@ -905,6 +974,100 @@ int main(char** argv, int argc)
 	{
 		std::cout << "Couldn't create vertex buffer" << std::endl;
 		return 1;
+	}
+
+	VkImage texture;
+	VkDeviceMemory textureMemory;
+
+	// Init texture
+	{
+		const size_t width = 8;
+		const size_t height = 8;
+		const size_t numPixels = width * height;
+		const size_t textureSize = numPixels * 4;
+		unsigned char data[textureSize];
+
+		const char* textureMap =
+			"........"
+			"..#..#.."
+			"..#..#.."
+			"..#..#.."
+			"........"
+			".#....#."
+			"..####.."
+			"........";
+
+		unsigned char bgCol[4] = { 255, 255, 255, 255 };
+		unsigned char fgCol[4] = { 0,   0,   0,   255 };
+		int bufferIndex = 0;
+
+		for (int i = 0; i < numPixels; i++)
+		{
+			unsigned char* col = textureMap[i] == '#' ? fgCol : bgCol;
+			data[bufferIndex++] = col[0];
+			data[bufferIndex++] = col[1];
+			data[bufferIndex++] = col[2];
+			data[bufferIndex++] = col[3];
+		}
+
+		bool created = CreateImage2D(device, width, height, VK_FORMAT_R8G8B8A8_UNORM, memoryProperties.memoryTypes, (void*)data, textureSize, &texture, &textureMemory);
+
+		if (created == false)
+		{
+			std::cout << "Couldn't create texture" << std::endl;
+			return 1;
+		}
+	}
+
+	VkSampler textureSampler;
+	VkImageView textureImageView;
+
+	{
+		VkSamplerCreateInfo samplerCreateInfo;
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.pNext = NULL;
+		samplerCreateInfo.flags = 0;
+		samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+		samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.mipLodBias = 0.0f;
+		samplerCreateInfo.anisotropyEnable = VK_FALSE;
+		samplerCreateInfo.maxAnisotropy = 1.0f;
+		samplerCreateInfo.compareEnable = VK_FALSE;
+		samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+		samplerCreateInfo.minLod = 0.0f;
+		samplerCreateInfo.maxLod = 0.0f;
+		samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+		samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+		result = vkCreateSampler(device, &samplerCreateInfo, NULL, &textureSampler);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create texture sampler" << std::endl;
+			return 1;
+		}
+
+		VkImageViewCreateInfo imageViewCreateInfo;
+		imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageViewCreateInfo.pNext = NULL;
+		imageViewCreateInfo.flags = 0;
+		imageViewCreateInfo.image = texture;
+		imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+		imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+		imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		result = vkCreateImageView(device, &imageViewCreateInfo, NULL, &textureImageView);
+
+		if (result != VK_SUCCESS)
+		{
+			std::cout << "Couldn't create texture image view" << std::endl;
+			return 1;
+		}
 	}
 
 	VkBuffer uniformBuffer;
